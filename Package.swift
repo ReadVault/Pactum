@@ -4,15 +4,15 @@ import PackageDescription
 let package = Package(
     name: "Pactum",
     platforms: [
-        .macOS(.v10_15)
+        .macOS(.v15)
     ],
     products: [
         .library(name: "PactumCore", targets: ["PactumCore"]),
-        .library(name: "PactumAuth0", targets: ["PactumCore", "Pactum"]),
+        .library(name: "Pactum", targets: ["PactumCore", "Pactum"]),
     ],
     dependencies: [
-        .package(url: "https://github.com/vapor/vapor.git", from: "4.0.0"),
-        .package(url: "https://github.com/vapor/jwt-kit.git", from: "4.0.0"),
+        .package(url: "https://github.com/vapor/vapor.git", from: "4.106.0"),
+        .package(url: "https://github.com/vapor/jwt-kit.git", from: "5.0.1"),
     ],
     targets: [
         .target(

@@ -1,8 +1,8 @@
 import Vapor
 
 extension RoutesBuilder {
-    
-    /// Registers an OAuth provider's router with
+
+    /// Registers an OpenID Connect provider's router with
     /// the parent route.
     ///
     /// - Parameters:
@@ -14,15 +14,16 @@ extension RoutesBuilder {
     ///   - scope: The scopes to get access to on authentication.
     ///   - completion: A callback with the current request and fetched
     ///     access token that is called when auth completes.
-    public func oAuth<OAuthProvider>(
-        from provider: OAuthProvider.Type,
+    public func oidc<OIDCProvider>(
+        from provider: OIDCProvider.Type,
         authenticate authUrl: String,
-        authenticateCallback: ((Request) throws -> (EventLoopFuture<Void>))? = nil,
+        authenticateCallback: ((Request) async throws -> Void)? = nil,
         callback: String,
         scope: [String] = [],
-        completion: @escaping (Request, String) throws -> EventLoopFuture<ResponseEncodable>
-    ) throws where OAuthProvider: FederatedService {
-        _ = try OAuthProvider(
+        completion: @escaping (Request, String) async throws -> ResponseEncodable
+    ) throws -> OIDCProvider
+    where OIDCProvider: FederatedService {
+        try OIDCProvider(
             routes: self,
             authenticate: authUrl,
             authenticateCallback: authenticateCallback,
@@ -31,8 +32,8 @@ extension RoutesBuilder {
             completion: completion
         )
     }
-    
-    /// Registers an OAuth provider's router with
+
+    /// Registers an OpenID Connect provider's router with
     /// the parent route and a redirection callback.
     ///
     /// - Parameters:
@@ -43,17 +44,21 @@ extension RoutesBuilder {
     ///     redirect to when authentication completes.
     ///   - scope: The scopes to get access to on authentication.
     ///   - redirect: The path/URL to redirect to when auth completes.
-    public func oAuth<OAuthProvider>(
-        from provider: OAuthProvider.Type,
+    public func oidc<OIDCProvider>(
+        from provider: OIDCProvider.Type,
         authenticate authUrl: String,
-        authenticateCallback: ((Request) throws -> (EventLoopFuture<Void>))? = nil,
+        authenticateCallback: ((Request) async throws -> Void)? = nil,
         callback: String,
         scope: [String] = [],
         redirect redirectURL: String
-    ) throws where OAuthProvider: FederatedService {
-        try self.oAuth(from: OAuthProvider.self, authenticate: authUrl, authenticateCallback: authenticateCallback, callback: callback, scope: scope) { (request, _) in
-            let redirect: Response = request.redirect(to: redirectURL)
-            return request.eventLoop.makeSucceededFuture(redirect)
+    ) throws -> OIDCProvider
+    where OIDCProvider: FederatedService {
+        try self.oidc(
+            from: OIDCProvider.self, authenticate: authUrl,
+            authenticateCallback: authenticateCallback, callback: callback, scope: scope
+        ) { (request, _) in
+            let redirect = request.redirect(to: redirectURL)
+            return redirect
         }
     }
 }
