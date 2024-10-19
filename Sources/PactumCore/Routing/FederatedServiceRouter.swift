@@ -57,7 +57,8 @@ public protocol FederatedServiceRouter: Sendable {
     func configureRoutes(
         withAuthURL authURL: String,
         authenticateCallback: (@Sendable (Request) async throws -> Void)?,
-        on router: RoutesBuilder) throws
+        on router: RoutesBuilder
+    ) async throws
 
     /// Gets an access token from an OAuth provider.
     /// This method is the main body of the `callback` handler.
@@ -99,6 +100,40 @@ extension FederatedServiceRouter {
         }
     }
 
+    func authURL(_ request: Request) async throws -> String {
+        let wellknown = try await request.client.get(URI(string: tokens.wellknown))
+        let authorization_endpoint = try wellknown.content.get(
+            String.self, at: ["authorization_endpoint"])
+
+        let nonce = String(UUID().uuidString.prefix(6))
+        try request.session.setNonce(nonce)
+
+        let pkce = String(UUID().uuidString.prefix(6))
+        try request.session.setPKCE(pkce)
+        let pkceHash = SHA256.hash(data: pkce.data(using: .utf8)!)
+        let pkceEncoded = Data(pkceHash).base64EncodedString()
+            .replacingOccurrences(of: "+", with: "-")
+            .replacingOccurrences(of: "/", with: "_")
+            .replacingOccurrences(of: "=", with: "")
+
+        var components = URLComponents(string: authorization_endpoint)!
+        components.queryItems = [
+            clientIDItem,
+            codeResponseTypeItem,
+            .init(name: "redirect_uri", value: self.callbackURL),
+            .init(name: "state", value: nonce),
+            .init(name: "code_challenge", value: pkceEncoded),
+            .init(name: "code_challenge_method", value: "S256"),
+            scopeItem,
+        ]
+
+        guard let url = components.url else {
+            throw Abort(.internalServerError)
+        }
+
+        return url.absoluteString
+    }
+
     public func fetchToken(from request: Request) async throws -> String {
         let code: String
         if let queryCode: String = try request.query.get(at: codeKey) {
@@ -116,7 +151,7 @@ extension FederatedServiceRouter {
             .map { $0.body.buffer }.get()
         let response = try await request.client.post(url, headers: self.callbackHeaders) {
             $0.body = buffer
-        }.get()
+        }
         return try response.content.get(String.self, at: ["access_token"])
     }
 
